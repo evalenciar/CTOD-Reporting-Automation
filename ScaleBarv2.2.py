@@ -12,46 +12,52 @@ import pytesseract
 import numpy as np
 from PIL import Image
 import openpyxl
-import tkinter as tk
-from tkinter import filedialog
 
 
+def read_tiff_pil(image_path):
+    """
+    Reads a TIFF image using PIL and converts it to OpenCV format.
+    :param image_path: Path to the TIFF file.
+    :return: OpenCV-compatible image (NumPy array) or None if reading fails.
+    """
+    try:
+        # Open TIFF using PIL
+        img = Image.open(image_path)
+
+        # Convert to NumPy array (grayscale or color)
+        img = np.array(img)
+
+        # Convert RGB to BGR (if needed for OpenCV)
+        if len(img.shape) == 3:  # Color image
+            img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+
+        return img
+    except Exception as e:
+        print(f"Error reading TIFF: {e}")
+        return None
 
 pytesseract.pytesseract.tesseract_cmd = r'C:\Users\pcunha\AppData\Local\Programs\Tesseract-OCR\tesseract.exe'
 
-
-#%%
-
-def select_image():
-    root = tk.Tk()
-    root.withdraw()  # Hide the main Tkinter window
-    file_path = filedialog.askopenfilename(
-        title="Select an Image",
-        filetypes=[("Image Files", "*.jpg;*.jpeg;*.png;*.bmp;*.tif;*.tiff")]
-    )
-    return file_path
-
-
 #%% Add a section that saves the image as a JPG first! and crop
-#ImagePath = r"A:\Projects\09_R&D\100001 (Materials - CTOD Reporting Automation)\CTOD Images\Raw\Cross Section\101256-2H-1_post.jpg"
-ImagePath = select_image()
-# TiffImage = cv2.imread(ImagePath)
-# cv2.imwrite('JPGImage.jpg',TiffImage)
-# Need the new image path as a jpg
-img = cv2.imread(ImagePath)
+
+image_path = r"A:\Projects\Projects 101251-101275\101256 (P66 - BL01 Testing)\Metallurgical\CTOD\-6\101256-6B-1.tif"
+img = read_tiff_pil(image_path)
+
+ScaleBarImg = img[1500:1900, 1400:2550] # Crop the image to remove the bottom and right side buffers
+cv2.imshow("Text Image",ScaleBarImg)
+cv2.waitKey(0)
+cv2.destroyAllWindows()
+    
+text = pytesseract.image_to_string(ScaleBarImg)
 
 #%% OCR getting the scale length
 
-text = pytesseract.image_to_string(img)
-
-#%%
 text = text.split("\n")[0]
 text = text.split()
 unit = text[1]
 length = float(text[0])
 
 #%% Image Processing for scale bar length
-ScaleBarImg = img[1500:1900, 1500:2550] # Crop the image to remove the bottom and right side buffers
 
 gray = cv2.cvtColor(ScaleBarImg, cv2.COLOR_BGR2GRAY) # convert to grayscale
 
@@ -144,6 +150,22 @@ def select_points(event, x, y, flags, param):
             vertical_distance2 = abs(y3 - y1)
             real_distance2 = vertical_distance2 / ratio  # Convert using scale factor
             RealDistances.append(real_distance2)
+            
+            # Draw vertical line (keeps the line intact even after clearing white lines)
+            mid_x = (x1 + x2 + x3) // 3
+            cv2.line(clone, (mid_x, y1), (mid_x, y2), (255, 0, 0), 2)
+
+            # Draw vertical line (keeps the line intact even after clearing white lines)
+            cv2.line(clone, (mid_x, y2), (mid_x, y3), (255, 0, 0), 2)
+
+            # Display distance with background
+            mid_y1 = (y1 + y2) // 2
+            draw_text_with_background(clone, f"{real_distance1:.4f}", (mid_x, mid_y1))
+            
+            mid_y2 = (y3 + y2) // 2
+            draw_text_with_background(clone, f"{real_distance2:.4f}", (mid_x, mid_y2))
+
+            print(f"Vertical distance: {vertical_distance1} pixels ({real_distance1:.4f} real units)")
 
             # Reset points to allow more vertical measurements
             points = []
@@ -195,13 +217,12 @@ while True:
                 
         for i in range(len(RealDistances)):
             if i%2 == 0:
-                draw_text_with_background(img,f"{RealDistances[i]:.3f} in",(50, 400+i*25))
+                draw_text_with_background(img,f"{RealDistances[i]:.4f} in",(50, 400+i*25))
             else:
-                draw_text_with_background(img,f"{RealDistances[i]:.3f} in",(2250, 400+i*25))
+                draw_text_with_background(img,f"{RealDistances[i]:.4f} in",(2250, 400+i*25))
             
         
         cv2.imshow("Measure Distances", img)
-        cv2.imwrite("FileName_Measured.jpg",img)
 
 cv2.destroyAllWindows()
 

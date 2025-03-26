@@ -15,12 +15,27 @@ import openpyxl
 import tkinter as tk
 from tkinter import filedialog
 
+def read_tiff_pil(image_path):
+    """
+    Reads a TIFF image using PIL and converts it to OpenCV format.
+    :param image_path: Path to the TIFF file.
+    :return: OpenCV-compatible image (NumPy array) or None if reading fails.
+    """
+    try:
+        # Open TIFF using PIL
+        img = Image.open(image_path)
 
+        # Convert to NumPy array (grayscale or color)
+        img = np.array(img)
 
-pytesseract.pytesseract.tesseract_cmd = r'C:\Users\pcunha\AppData\Local\Programs\Tesseract-OCR\tesseract.exe'
+        # Convert RGB to BGR (if needed for OpenCV)
+        if len(img.shape) == 3:  # Color image
+            img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 
-
-#%%
+        return img
+    except Exception as e:
+        print(f"Error reading TIFF: {e}")
+        return None
 
 def select_image():
     root = tk.Tk()
@@ -31,27 +46,33 @@ def select_image():
     )
     return file_path
 
+# pytesseract.pytesseract.tesseract_cmd = r'C:\Users\pcunha\AppData\Local\Programs\Tesseract-OCR\tesseract.exe'
 
 #%% Add a section that saves the image as a JPG first! and crop
-#ImagePath = r"A:\Projects\09_R&D\100001 (Materials - CTOD Reporting Automation)\CTOD Images\Raw\Cross Section\101256-2H-1_post.jpg"
-ImagePath = select_image()
-# TiffImage = cv2.imread(ImagePath)
-# cv2.imwrite('JPGImage.jpg',TiffImage)
-# Need the new image path as a jpg
-img = cv2.imread(ImagePath)
+
+image_path = select_image()
+
+# image_path = r"A:\Projects\09_R&D\100001 (Materials - CTOD Reporting Automation)\CTOD Images\Raw\Cross Section\101256-2H-1_post.tif"
+img = read_tiff_pil(image_path)
+
+# ScaleBarImg = img[1500:1900, 1400:2550] # Crop the image to remove the bottom and right side buffers
+ScaleBarImg = img
+# graytext = cv2.cvtColor(ScaleBarImg, cv2.COLOR_BGR2GRAY)
+# invertedtext = cv2.bitwise_not(ScaleBarImg)
+# cv2.imshow("Text Image",invertedtext)
+# cv2.waitKey(0)
+# cv2.destroyAllWindows()
+    
+text = pytesseract.image_to_string(ScaleBarImg)
 
 #%% OCR getting the scale length
 
-text = pytesseract.image_to_string(img)
-
-#%%
 text = text.split("\n")[0]
 text = text.split()
 unit = text[1]
 length = float(text[0])
 
 #%% Image Processing for scale bar length
-ScaleBarImg = img[1500:1900, 1500:2550] # Crop the image to remove the bottom and right side buffers
 
 gray = cv2.cvtColor(ScaleBarImg, cv2.COLOR_BGR2GRAY) # convert to grayscale
 
@@ -116,7 +137,10 @@ def select_points(event, x, y, flags, param):
                 x1, x2 = x2, x1
             B = x2 - x1
             segment_length = B / 10
-
+            offset = B/100
+            
+            
+            
             # Draw 9 vertical white lines on the mask (for removal later)
             divided_x_positions = [int(x1 + i * segment_length) for i in range(1, 10)]  # 9 divisions
             for x_pos in divided_x_positions: 
@@ -144,6 +168,22 @@ def select_points(event, x, y, flags, param):
             vertical_distance2 = abs(y3 - y1)
             real_distance2 = vertical_distance2 / ratio  # Convert using scale factor
             RealDistances.append(real_distance2)
+            
+            # Draw vertical line (keeps the line intact even after clearing white lines)
+            mid_x = (x1 + x2 + x3) // 3
+            cv2.line(clone, (mid_x, y1), (mid_x, y2), (255, 0, 0), 2)
+
+            # Draw vertical line (keeps the line intact even after clearing white lines)
+            cv2.line(clone, (mid_x, y2), (mid_x, y3), (255, 0, 0), 2)
+
+            # Display distance with background
+            mid_y1 = (y1 + y2) // 2
+            draw_text_with_background(clone, f"{real_distance1:.4f}", (mid_x, mid_y1))
+            
+            mid_y2 = (y3 + y2) // 2
+            draw_text_with_background(clone, f"{real_distance2:.4f}", (mid_x, mid_y2))
+
+            print(f"Vertical distance: {vertical_distance1} pixels ({real_distance1:.4f} real units)")
 
             # Reset points to allow more vertical measurements
             points = []
@@ -166,8 +206,8 @@ while True:
         Old_y1 = 0
         Old_y2 = 0
         print("Preston's Final Masterpiece:")
-        draw_text_with_background(img, "Pre Crack",(50, 300), 2, 3)
-        draw_text_with_background(img,"J Whatevs",(2250, 300), 2, 3)
+        draw_text_with_background(img, "Initial Crack",(50, 300), 2, 3)
+        draw_text_with_background(img,"Final Crack",(2250, 300), 2, 3)
         for i in range(len(VertMeasPoint)-1):
             if i%3 == 0:
                 
@@ -187,21 +227,20 @@ while True:
                 
                 cv2.line(img,(mid_x,VertMeasPoint[i][1]),(mid_x,VertMeasPoint[i+1][1]), (0,0,255),2)
                 
-                cv2.line(img,(mid_x,VertMeasPoint[i+1][1]),(mid_x,VertMeasPoint[i+2][1]), (0,0,255),2)
+                cv2.line(img,(mid_x,VertMeasPoint[i+1][1]),(mid_x,VertMeasPoint[i+2][1]), (3,240,252),2)
                 
                 cv2.line(img,(mid_x-20,VertMeasPoint[i][1]),(mid_x+20,VertMeasPoint[i][1]), (0,0,255),2)
                 cv2.line(img,(mid_x-20,VertMeasPoint[i+1][1]),(mid_x+20,VertMeasPoint[i+1][1]), (0,0,255),2)
-                cv2.line(img,(mid_x-20,VertMeasPoint[i+2][1]),(mid_x+20,VertMeasPoint[i+2][1]), (0,0,255),2)
+                cv2.line(img,(mid_x-20,VertMeasPoint[i+2][1]),(mid_x+20,VertMeasPoint[i+2][1]), (3,240,252),2)
                 
         for i in range(len(RealDistances)):
             if i%2 == 0:
-                draw_text_with_background(img,f"{RealDistances[i]:.3f} in",(50, 400+i*25))
+                draw_text_with_background(img,f"{RealDistances[i]:.4f} in",(50, 400+i*25))
             else:
-                draw_text_with_background(img,f"{RealDistances[i]:.3f} in",(2250, 400+i*25))
+                draw_text_with_background(img,f"{RealDistances[i]:.4f} in",(2250, 400+i*25))
             
         
         cv2.imshow("Measure Distances", img)
-        cv2.imwrite("FileName_Measured.jpg",img)
 
 cv2.destroyAllWindows()
 

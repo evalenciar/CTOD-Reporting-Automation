@@ -12,18 +12,48 @@ import pytesseract
 import numpy as np
 from PIL import Image
 
+
+def read_tiff_pil(image_path):
+    """
+    Reads a TIFF image using PIL and converts it to OpenCV format.
+    :param image_path: Path to the TIFF file.
+    :return: OpenCV-compatible image (NumPy array) or None if reading fails.
+    """
+    try:
+        # Open TIFF using PIL
+        img = Image.open(image_path)
+
+        # Convert to NumPy array (grayscale or color)
+        img = np.array(img)
+
+        # Convert RGB to BGR (if needed for OpenCV)
+        if len(img.shape) == 3:  # Color image
+            img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+
+        return img
+    except Exception as e:
+        print(f"Error reading TIFF: {e}")
+        return None
+    
+    
+#%%
 pytesseract.pytesseract.tesseract_cmd = r'C:\Users\pcunha\AppData\Local\Programs\Tesseract-OCR\tesseract.exe'
 
 #%% Add a section that saves the image as a JPG first! and crop
-ImagePath = r"A:\Projects\09_R&D\100001 (Materials - CTOD Reporting Automation)\CTOD Images\Raw\Cross Section\101256-2H-1_post.jpg"
-# TiffImage = cv2.imread(ImagePath)
-# cv2.imwrite('JPGImage.jpg',TiffImage)
-# Need the new image path as a jpg
-img = cv2.imread(ImagePath)
+
+image_path = r"A:\Projects\Projects 101251-101275\101256 (P66 - BL01 Testing)\Metallurgical\CTOD\-6\101256-6B-1.tif"
+img = read_tiff_pil(image_path)
+
+#ImagePath = r"C:\Users\pcunha\OneDrive - Acuren Inspection, Inc\Documents\Python Scripts\101256-6B-1.jpg"
+#img = cv2.imread(ImagePath)
+ScaleBarImg = img[1500:1900, 1400:2550] # Crop the image to remove the bottom and right side buffers
+cv2.imshow("Text Image",ScaleBarImg)
+cv2.waitKey(0)
+cv2.destroyAllWindows()
+    
+text = pytesseract.image_to_string(ScaleBarImg)
 
 #%% OCR getting the scale length
-
-text = pytesseract.image_to_string(img)
 
 text = text.split("\n")[0]
 text = text.split()
@@ -31,7 +61,7 @@ unit = text[1]
 length = float(text[0])
 
 #%% Image Processing for scale bar length
-ScaleBarImg = img[1500:1900, 1500:2550] # Crop the image to remove the bottom and right side buffers
+
 
 gray = cv2.cvtColor(ScaleBarImg, cv2.COLOR_BGR2GRAY) # convert to grayscale
 
